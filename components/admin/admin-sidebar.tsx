@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import {
   LayoutDashboard,
   Boxes,
+  PackagePlus,
   ScrollText,
   ShoppingCart,
   Receipt,
@@ -15,6 +16,7 @@ import {
   Truck,
   PackageSearch,
   BarChart3,
+  Landmark,
   Settings,
   Store,
   Menu,
@@ -23,8 +25,10 @@ import {
 
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin/articulos", label: "Catálogo de artículos", icon: PackagePlus },
   { href: "/admin/inventario", label: "Inventario", icon: Boxes },
   { href: "/admin/kardex", label: "Kardex", icon: ScrollText },
+  { href: "/admin/contabilidad/puc", label: "Contabilidad", icon: Landmark },
   { href: "/admin/compras", label: "Compras", icon: ShoppingCart },
   { href: "/admin/ventas", label: "Ventas", icon: Receipt },
   { href: "/admin/clientes", label: "Clientes", icon: Users },
