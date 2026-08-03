@@ -1,0 +1,99 @@
+"use client"
+
+import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
+import { ArrowLeft, CheckCircle2, FileSpreadsheet, Landmark, PackagePlus, Plus, Save, Search, Trash2, Warehouse } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
+import { formatCOP } from "@/lib/data"
+import { initialProductMaster, initialWarehouses, ProductMaster, PRODUCT_STORAGE_KEY, WarehouseRecord, WAREHOUSE_STORAGE_KEY } from "@/lib/product-master"
+
+type NoteLine = { id: string; productId: string; reference: string; detail: string; unit: string; quantity: number; unitCost: number; currentStock: number; warehouse: string }
+type AccountingLine = { id: string; code: string; detail: string; debit: number; credit: number; thirdParty: string }
+type PucAccount = { code: string; name: string; active: boolean; acceptsEntries: boolean }
+type InventoryNote = { id: string; number: string; date: string; detail: string; thirdParty: string; sourceDocument: string; externalNumber: string; warehouse: string; costCenter: string; subCostCenter: string; lines: NoteLine[]; accounting: AccountingLine[]; total: number; createdAt: string }
+
+const NOTE_STORAGE_KEY = "ferreia-inventory-notes"
+const defaultAccounts: PucAccount[] = [
+  { code: "143501", name: "Inventario de ferretería y herramientas", active: true, acceptsEntries: true },
+  { code: "519595", name: "Gastos diversos – ajustes de inventario", active: true, acceptsEntries: true },
+  { code: "429595", name: "Ingresos diversos – ajustes de inventario", active: true, acceptsEntries: true },
+]
+
+export function InventoryNoteView() {
+  const [products, setProducts] = useState(initialProductMaster)
+  const [warehouses, setWarehouses] = useState(initialWarehouses)
+  const [accounts, setAccounts] = useState(defaultAccounts)
+  const [notes, setNotes] = useState<InventoryNote[]>([])
+  const [number, setNumber] = useState("000000001")
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const [detail, setDetail] = useState("")
+  const [thirdParty, setThirdParty] = useState("")
+  const [sourceDocument, setSourceDocument] = useState("")
+  const [externalNumber, setExternalNumber] = useState("")
+  const [warehouse, setWarehouse] = useState(initialWarehouses[0].name)
+  const [costCenter, setCostCenter] = useState("")
+  const [subCostCenter, setSubCostCenter] = useState("")
+  const [selectedProduct, setSelectedProduct] = useState("")
+  const [lines, setLines] = useState<NoteLine[]>([])
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    const storedProducts = localStorage.getItem(PRODUCT_STORAGE_KEY); const storedWarehouses = localStorage.getItem(WAREHOUSE_STORAGE_KEY); const storedNotes = localStorage.getItem(NOTE_STORAGE_KEY); const storedPuc = localStorage.getItem("ferreia-accounting-puc")
+    if (storedProducts) setProducts(JSON.parse(storedProducts) as ProductMaster[])
+    if (storedWarehouses) { const data = JSON.parse(storedWarehouses) as WarehouseRecord[]; setWarehouses(data); setWarehouse(data.find((item) => item.active)?.name ?? "") }
+    if (storedNotes) { const data = JSON.parse(storedNotes) as InventoryNote[]; setNotes(data); setNumber(String(data.length + 1).padStart(9, "0")) }
+    if (storedPuc) { const data = (JSON.parse(storedPuc) as PucAccount[]).filter((item) => item.active && item.acceptsEntries); if (data.length) setAccounts(data) }
+  }, [])
+
+  const total = lines.reduce((sum, line) => sum + line.quantity * line.unitCost, 0)
+  const positiveQuantity = lines.filter((line) => line.quantity > 0).reduce((sum, line) => sum + line.quantity, 0)
+  const negativeQuantity = Math.abs(lines.filter((line) => line.quantity < 0).reduce((sum, line) => sum + line.quantity, 0))
+  const accounting = useMemo(() => buildAccounting(lines, thirdParty), [lines, thirdParty])
+  const debit = accounting.reduce((sum, line) => sum + line.debit, 0); const credit = accounting.reduce((sum, line) => sum + line.credit, 0)
+
+  function addProduct() {
+    const product = products.find((item) => item.id === selectedProduct); if (!product) return
+    const existing = lines.find((line) => line.productId === product.id && line.warehouse === warehouse)
+    if (existing) { setLines(lines.map((line) => line.id === existing.id ? { ...line, quantity: line.quantity + 1 } : line)); return }
+    setLines([...lines, { id: `LINE-${Date.now()}`, productId: product.id, reference: product.reference, detail: product.name, unit: product.unit, quantity: 1, unitCost: product.cost, currentStock: product.stock, warehouse }]); setSelectedProduct("")
+  }
+  function updateLine(id: string, patch: Partial<NoteLine>) { setSaved(false); setLines(lines.map((line) => line.id === id ? { ...line, ...patch } : line)) }
+  function saveNote() {
+    if (!detail.trim() || !lines.length || lines.some((line) => line.quantity === 0) || Math.abs(debit - credit) > 0.01) return
+    const note: InventoryNote = { id: `NI-${Date.now()}`, number, date, detail: detail.trim(), thirdParty, sourceDocument, externalNumber, warehouse, costCenter, subCostCenter, lines, accounting, total, createdAt: new Date().toISOString() }
+    const nextNotes = [...notes, note]; const nextProducts = products.map((product) => { const adjustment = lines.filter((line) => line.productId === product.id).reduce((sum, line) => sum + line.quantity, 0); return adjustment ? { ...product, stock: product.stock + adjustment } : product })
+    setNotes(nextNotes); setProducts(nextProducts); localStorage.setItem(NOTE_STORAGE_KEY, JSON.stringify(nextNotes)); localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(nextProducts)); setSaved(true)
+  }
+  function newNote() { setNumber(String(notes.length + 1).padStart(9, "0")); setDetail(""); setThirdParty(""); setSourceDocument(""); setExternalNumber(""); setCostCenter(""); setSubCostCenter(""); setLines([]); setSaved(false) }
+  function exportCsv() { const rows = [["Referencia", "Artículo", "Unidad", "Cantidad", "Costo unitario", "Valor total", "Saldo anterior", "Saldo nuevo", "Bodega"], ...lines.map((line) => [line.reference, line.detail, line.unit, line.quantity, line.unitCost, line.quantity * line.unitCost, line.currentStock, line.currentStock + line.quantity, line.warehouse])]; const csv = rows.map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")).join("\n"); const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" })); link.download = `nota-inventario-NI2-${number}.csv`; link.click(); URL.revokeObjectURL(link.href) }
+
+  return <div className="space-y-5">
+    <Button asChild variant="ghost" size="sm"><Link href="/admin/inventario"><ArrowLeft className="mr-2 h-4 w-4" />Volver a existencias</Link></Button>
+    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div><div className="flex items-center gap-2"><h1 className="text-2xl font-bold">Nota de inventarios</h1><Badge variant="secondary" className="font-mono text-rose-700">NI2 {number}</Badge></div><p className="mt-1 text-sm text-muted-foreground">Ajustes de existencias con afectación contable y trazabilidad</p></div><div className="flex gap-2"><Button variant="outline" onClick={newNote}><Plus className="mr-2 h-4 w-4" />Nueva</Button><Button onClick={saveNote} disabled={saved || !lines.length}><Save className="mr-2 h-4 w-4" />{saved ? "Guardada" : "Guardar nota"}</Button></div></div>
+    {saved && <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><CheckCircle2 className="h-4 w-4" />Nota NI2 {number} guardada y existencias actualizadas correctamente.</div>}
+    <Card><CardContent className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4"><Field label="Fecha"><Input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></Field><Field label="Bodega origen"><Select value={warehouse} onValueChange={(value) => value && setWarehouse(value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{warehouses.filter((item) => item.active).map((item) => <SelectItem key={item.id} value={item.name}>{item.name}</SelectItem>)}</SelectContent></Select></Field><Field label="Número externo"><Input value={externalNumber} onChange={(event) => setExternalNumber(event.target.value)} /></Field><Field label="Comprobante origen"><Input value={sourceDocument} onChange={(event) => setSourceDocument(event.target.value)} placeholder="Tipo y número" /></Field><Field label="Detalle *" wide><Input value={detail} onChange={(event) => setDetail(event.target.value)} placeholder="Motivo y descripción del ajuste" /></Field><Field label="Tercero"><Input value={thirdParty} onChange={(event) => setThirdParty(event.target.value)} placeholder="NIT o nombre" /></Field><Field label="Centro de costo"><Input value={costCenter} onChange={(event) => setCostCenter(event.target.value)} /></Field><Field label="Subcentro de costo"><Input value={subCostCenter} onChange={(event) => setSubCostCenter(event.target.value)} /></Field></CardContent></Card>
+    <Tabs defaultValue="inventarios" className="space-y-4"><TabsList><TabsTrigger value="inventarios">Inventarios</TabsTrigger><TabsTrigger value="contabilidad">Contabilidad <Badge variant="secondary" className="ml-2">{accounting.length}</Badge></TabsTrigger></TabsList>
+      <TabsContent value="inventarios" className="space-y-4"><Card><CardContent className="p-4"><div className="flex flex-col gap-3 md:flex-row"><Select value={selectedProduct} onValueChange={(value) => value && setSelectedProduct(value)}><SelectTrigger className="flex-1"><SelectValue placeholder="Buscar y seleccionar artículo por referencia o nombre" /></SelectTrigger><SelectContent>{products.filter((item) => item.active).map((item) => <SelectItem key={item.id} value={item.id}>{item.reference} · {item.name} · Stock {item.stock}</SelectItem>)}</SelectContent></Select><Button onClick={addProduct} disabled={!selectedProduct}><PackagePlus className="mr-2 h-4 w-4" />Adicionar artículo</Button><Button variant="outline" onClick={exportCsv} disabled={!lines.length}><FileSpreadsheet className="mr-2 h-4 w-4" />Excel / CSV</Button></div></CardContent></Card><Card className="overflow-hidden"><div className="overflow-x-auto"><Table><TableHeader><TableRow className="bg-muted/40"><TableHead>Referencia</TableHead><TableHead>Detalle</TableHead><TableHead>Und.</TableHead><TableHead className="w-32">Cantidad (+/-)</TableHead><TableHead className="w-36">Costo unitario</TableHead><TableHead className="text-right">Valor total</TableHead><TableHead className="text-right">Saldo anterior</TableHead><TableHead className="text-right">Saldo nuevo</TableHead><TableHead>Bodega</TableHead><TableHead /></TableRow></TableHeader><TableBody>{lines.map((line) => <TableRow key={line.id}><TableCell className="font-mono font-semibold">{line.reference}</TableCell><TableCell className="min-w-56 font-medium">{line.detail}</TableCell><TableCell>{line.unit}</TableCell><TableCell><Input type="number" value={line.quantity} onChange={(event) => updateLine(line.id, { quantity: Number(event.target.value) })} className={line.quantity < 0 ? "text-rose-700" : "text-emerald-700"} /></TableCell><TableCell><Input type="number" min="0" value={line.unitCost} onChange={(event) => updateLine(line.id, { unitCost: Number(event.target.value) })} /></TableCell><TableCell className="text-right font-semibold">{formatCOP(line.quantity * line.unitCost)}</TableCell><TableCell className="text-right">{line.currentStock}</TableCell><TableCell className={`text-right font-bold ${line.currentStock + line.quantity < 0 ? "text-rose-700" : ""}`}>{line.currentStock + line.quantity}</TableCell><TableCell>{line.warehouse}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => setLines(lines.filter((item) => item.id !== line.id))}><Trash2 className="h-4 w-4" /></Button></TableCell></TableRow>)}{!lines.length && <TableRow><TableCell colSpan={10} className="h-40 text-center text-muted-foreground"><Search className="mx-auto mb-2 h-6 w-6" />Adiciona artículos para registrar el ajuste.</TableCell></TableRow>}</TableBody></Table></div><div className="flex flex-col gap-3 border-t bg-muted/20 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex gap-4 text-xs"><span>Entradas: <b className="text-emerald-700">+{positiveQuantity}</b></span><span>Salidas: <b className="text-rose-700">-{negativeQuantity}</b></span></div><div className="text-right"><span className="mr-4 text-xs text-muted-foreground">Valor neto del ajuste</span><span className={`text-lg font-bold ${total < 0 ? "text-rose-700" : "text-emerald-700"}`}>{formatCOP(total)}</span></div></div></Card></TabsContent>
+      <TabsContent value="contabilidad"><Card className="overflow-hidden"><div className="flex items-center justify-between border-b px-5 py-4"><div className="flex items-center gap-2"><Landmark className="h-5 w-5 text-primary" /><div><p className="font-semibold">Afectación contable automática</p><p className="text-xs text-muted-foreground">Generada según entradas y salidas valorizadas</p></div></div><Badge className={Math.abs(debit - credit) < 0.01 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"} variant="secondary">{Math.abs(debit - credit) < 0.01 ? "Balanceada" : "Desbalanceada"}</Badge></div><Table><TableHeader><TableRow><TableHead>Código PUC</TableHead><TableHead>Cuenta / detalle</TableHead><TableHead>Base</TableHead><TableHead className="text-right">Débito</TableHead><TableHead className="text-right">Crédito</TableHead><TableHead>Tercero</TableHead></TableRow></TableHeader><TableBody>{accounting.map((line) => { const account = accounts.find((item) => item.code === line.code); return <TableRow key={line.id}><TableCell className="font-mono font-semibold">{line.code}</TableCell><TableCell><p className="font-medium">{account?.name ?? line.detail}</p><p className="text-xs text-muted-foreground">{line.detail}</p></TableCell><TableCell>{formatCOP(line.debit || line.credit)}</TableCell><TableCell className="text-right font-semibold">{line.debit ? formatCOP(line.debit) : "—"}</TableCell><TableCell className="text-right font-semibold">{line.credit ? formatCOP(line.credit) : "—"}</TableCell><TableCell>{line.thirdParty || "—"}</TableCell></TableRow>})}</TableBody></Table><div className="grid grid-cols-2 gap-4 border-t bg-muted/20 p-4 text-right"><div><p className="text-xs text-muted-foreground">Total débitos</p><p className="font-bold">{formatCOP(debit)}</p></div><div><p className="text-xs text-muted-foreground">Total créditos</p><p className="font-bold">{formatCOP(credit)}</p></div></div></Card></TabsContent>
+    </Tabs>
+  </div>
+}
+
+function buildAccounting(lines: NoteLine[], thirdParty: string): AccountingLine[] {
+  const entries = lines.filter((line) => line.quantity > 0).reduce((sum, line) => sum + line.quantity * line.unitCost, 0)
+  const exits = Math.abs(lines.filter((line) => line.quantity < 0).reduce((sum, line) => sum + line.quantity * line.unitCost, 0))
+  const result: AccountingLine[] = []
+  if (entries) { result.push({ id: "entry-inventory", code: "143501", detail: "Entrada por ajuste de inventario", debit: entries, credit: 0, thirdParty }); result.push({ id: "entry-income", code: "429595", detail: "Contrapartida de mayor valor de inventario", debit: 0, credit: entries, thirdParty }) }
+  if (exits) { result.push({ id: "exit-expense", code: "519595", detail: "Pérdida o gasto por ajuste de inventario", debit: exits, credit: 0, thirdParty }); result.push({ id: "exit-inventory", code: "143501", detail: "Salida por ajuste de inventario", debit: 0, credit: exits, thirdParty }) }
+  return result
+}
+
+function Field({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) { return <div className={`space-y-1.5 ${wide ? "md:col-span-2" : ""}`}><Label>{label}</Label>{children}</div> }
