@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { PageHeader } from "@/components/admin/page-header"
 import { NewSaleAction } from "@/components/admin/admin-actions"
 import { Card, CardContent } from "@/components/ui/card"
@@ -12,7 +13,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { ORDERS, formatCOP } from "@/lib/data"
-import { Search } from "lucide-react"
+import { MOVEMENT_MODULES } from "@/lib/movement-modules"
+import { ArrowRight, Search, ShoppingCart } from "lucide-react"
 
 const estadoColor: Record<string, string> = {
   Pendiente: "bg-amber-100 text-amber-800",
@@ -26,6 +28,7 @@ const estadoColor: Record<string, string> = {
 export default function VentasPage() {
   const totalVendido = ORDERS.filter((o) => o.estado !== "Cancelado").reduce((a, o) => a + o.total, 0)
   const pendientes = ORDERS.filter((o) => o.estado === "Pendiente").length
+  const posModules = MOVEMENT_MODULES.filter((module) => module.category === "Punto de venta")
 
   return (
     <div>
@@ -34,6 +37,8 @@ export default function VentasPage() {
         description="Gestión de pedidos del ecommerce y ventas en mostrador (POS)"
         action={<NewSaleAction />}
       />
+
+      <div className="mb-5"><div className="mb-3 flex items-center gap-2"><ShoppingCart className="h-5 w-5 text-primary" /><div><h2 className="font-bold">Punto de venta POS</h2><p className="text-xs text-muted-foreground">Facturación, devoluciones y operaciones rápidas de caja</p></div></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{posModules.map((module) => <Link key={module.slug} href={`/admin/movimientos/${module.slug}`} className="group rounded-xl border bg-card p-4 transition-all hover:border-primary/40 hover:shadow-md"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-bold">{module.name}</p><p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{module.description}</p></div><ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" /></div></Link>)}</div></div>
 
       <div className="mb-4 grid grid-cols-3 gap-3">
         <Card>

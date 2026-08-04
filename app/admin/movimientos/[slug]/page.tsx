@@ -6,12 +6,15 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { getMovementModule, MOVEMENT_MODULES } from "@/lib/movement-modules"
 import { InventoryNoteView } from "@/components/admin/inventory-note-view"
+import { ElectronicBillingView, ElectronicDocumentKind } from "@/components/admin/electronic-billing-view"
 
 export function generateStaticParams() { return MOVEMENT_MODULES.map((item) => ({ slug: item.slug })) }
 
 export default async function MovementModulePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params; const module = getMovementModule(slug); if (!module) notFound()
   if (slug === "nota-inventarios") return <InventoryNoteView />
+  const electronicDocuments: Record<string, ElectronicDocumentKind> = { "facturacion-pos": "pos", "factura-venta": "invoice", "factura-electronica": "invoice", "devolucion-pos": "pos-return", "devolucion-factura-electronica": "invoice-return" }
+  if (electronicDocuments[slug]) return <ElectronicBillingView kind={electronicDocuments[slug]} />
   const dianRequirements = module.dian ? ["Tipo y número de identificación del adquirente", "Resolución, prefijo y rango de numeración autorizado", "Fecha, hora, moneda y forma o medio de pago", "Detalle con código, cantidad, unidad de medida, descripción y valor", "Impuestos discriminados por tarifa, retenciones, descuentos y totales", "Generación del XML según anexo técnico aplicable", "Firma digital, CUFE o CUDE y código QR", "Transmisión y validación previa DIAN", "Entrega de XML y representación gráfica al adquirente", "Estados de envío, aceptación, rechazo y contingencia"] : []
   return <div className="space-y-5"><div><Button asChild variant="ghost" size="sm" className="mb-3"><Link href="/admin/movimientos"><ArrowLeft className="mr-2 h-4 w-4" />Volver a movimientos</Link></Button><div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold">{module.name}</h1>{module.dian && <Badge className="bg-cyan-50 text-cyan-800" variant="secondary">{module.dian}</Badge>}</div><p className="mt-1 text-sm text-muted-foreground">{module.description}</p></div><Button><Settings2 className="mr-2 h-4 w-4" />Configurar submódulo</Button></div></div>
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Info icon={FileCheck2} label="Estado" value={module.status} /><Info icon={Landmark} label="Contabilidad" value={module.effects.includes("Contabilidad") ? "Genera asiento" : "Sin afectación"} /><Info icon={PackageCheck} label="Inventario" value={module.effects.includes("Inventario") ? "Genera movimiento" : "Sin afectación"} /><Info icon={CircleDollarSign} label="Cartera / caja" value={module.effects.some((item) => item === "Cartera" || item === "Caja") ? "Integrado" : "No aplica"} /></div>
