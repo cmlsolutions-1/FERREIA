@@ -25,6 +25,7 @@ import {
   X,
 } from "lucide-react"
 import { MOVEMENT_CATEGORIES, MOVEMENT_MODULES } from "@/lib/movement-modules"
+import { WMS_MODULES } from "@/lib/wms-modules"
 
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
@@ -60,6 +61,7 @@ export function AdminSidebar() {
   const [inventoryOpen, setInventoryOpen] = useState(pathname.startsWith("/admin/inventario") || currentMovement?.category === "Inventarios")
   const [accountingOpen, setAccountingOpen] = useState(pathname.startsWith("/admin/contabilidad") || currentMovement?.category === "Contabilidad")
   const [salesOpen, setSalesOpen] = useState(pathname === "/admin/ventas" || ["Ventas", "Punto de venta"].includes(currentMovement?.category ?? ""))
+  const [logisticsOpen, setLogisticsOpen] = useState(pathname.startsWith("/admin/logistica"))
 
   return (
     <>
@@ -159,6 +161,14 @@ export function AdminSidebar() {
                   <Link href="/admin/ventas" onClick={() => setOpen(false)} className={cn("flex items-center gap-2 rounded-md px-2 py-2 text-xs transition-colors", pathname === "/admin/ventas" ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground" : "text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground")}><span className={cn("h-1.5 w-1.5 rounded-full", pathname === "/admin/ventas" ? "bg-sidebar-primary" : "bg-sidebar-foreground/25")} />Gestión de ventas</Link>
                   {["Ventas", "Punto de venta"].map((category) => <div key={category}><p className="px-2 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-sidebar-foreground/40">{category === "Ventas" ? "Documentos de venta" : "Punto de venta POS"}</p>{MOVEMENT_MODULES.filter((module) => module.category === category).map((module) => { const moduleActive = pathname === `/admin/movimientos/${module.slug}`; return <Link key={module.slug} href={`/admin/movimientos/${module.slug}`} onClick={() => setOpen(false)} className={cn("flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] leading-4 transition-colors", moduleActive ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground" : "text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground")}><span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", moduleActive ? "bg-sidebar-primary" : "bg-sidebar-foreground/25")} />{module.name}</Link> })}</div>)}
                 </div>}
+              </div>
+            )
+            if (item.href === "/admin/logistica") return (
+              <div key={item.href}>
+                <button type="button" onClick={() => setLogisticsOpen((value) => !value)} className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors", pathname.startsWith("/admin/logistica") ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground")}>
+                  <Icon className="h-4 w-4 shrink-0" /><span className="flex-1 text-left">WMS Logístico</span><ChevronDown className={cn("h-4 w-4 transition-transform", logisticsOpen && "rotate-180")} />
+                </button>
+                {logisticsOpen && <div className="ml-3 mt-1 space-y-0.5 border-l border-sidebar-border py-1 pl-2"><Link href="/admin/logistica" onClick={() => setOpen(false)} className={cn("flex items-center gap-2 rounded-md px-2 py-2 text-xs transition-colors", pathname === "/admin/logistica" ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground" : "text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground")}><span className={cn("h-1.5 w-1.5 rounded-full", pathname === "/admin/logistica" ? "bg-sidebar-primary" : "bg-sidebar-foreground/25")} />Dashboard logístico</Link><p className="px-2 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-sidebar-foreground/40">Operaciones WMS</p>{WMS_MODULES.map((module) => { const href=`/admin/logistica/${module.key}`; const moduleActive=pathname===href; return <Link key={module.key} href={href} onClick={() => setOpen(false)} className={cn("flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] leading-4 transition-colors", moduleActive ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground" : "text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground")}><span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", moduleActive ? "bg-sidebar-primary" : "bg-sidebar-foreground/25")} />{module.shortName}</Link> })}</div>}
               </div>
             )
             return (
