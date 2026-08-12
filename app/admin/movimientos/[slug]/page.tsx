@@ -8,6 +8,8 @@ import { getMovementModule, MOVEMENT_MODULES } from "@/lib/movement-modules"
 import { InventoryNoteView } from "@/components/admin/inventory-note-view"
 import { ElectronicBillingView, ElectronicDocumentKind } from "@/components/admin/electronic-billing-view"
 import { QuotationView } from "@/components/admin/quotation-view"
+import { AccountsReceivableDebitNoteView } from "@/components/admin/accounts-receivable-debit-note-view"
+import { CustomerOrderView } from "@/components/admin/customer-order-view"
 
 export function generateStaticParams() { return MOVEMENT_MODULES.map((item) => ({ slug: item.slug })) }
 
@@ -15,6 +17,8 @@ export default async function MovementModulePage({ params }: { params: Promise<{
   const { slug } = await params; const module = getMovementModule(slug); if (!module) notFound()
   if (slug === "nota-inventarios") return <InventoryNoteView />
   if (slug === "cotizacion") return <QuotationView />
+  if (slug === "nota-debito-cuentas-cobrar") return <AccountsReceivableDebitNoteView />
+  if (slug === "pedido-cliente") return <CustomerOrderView />
   const electronicDocuments: Record<string, ElectronicDocumentKind> = { "facturacion-pos": "pos", "factura-venta": "invoice", "devolucion-pos": "pos-return", "devolucion-factura-electronica": "invoice-return", "nota-credito-facturacion": "credit-note", "nota-debito-facturacion": "debit-note" }
   if (electronicDocuments[slug]) return <ElectronicBillingView kind={electronicDocuments[slug]} />
   const dianRequirements = module.dian ? ["Tipo y número de identificación del adquirente", "Resolución, prefijo y rango de numeración autorizado", "Fecha, hora, moneda y forma o medio de pago", "Detalle con código, cantidad, unidad de medida, descripción y valor", "Impuestos discriminados por tarifa, retenciones, descuentos y totales", "Generación del XML según anexo técnico aplicable", "Firma digital, CUFE o CUDE y código QR", "Transmisión y validación previa DIAN", "Entrega de XML y representación gráfica al adquirente", "Estados de envío, aceptación, rechazo y contingencia"] : []
